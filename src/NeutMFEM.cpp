@@ -100,14 +100,25 @@ private:
 };
 
 // ============================================================================
-// CONSTRUCTEUR
+// CONSTRUCTEURS
 // ============================================================================
 
 NeutMFEM::NeutMFEM(int order, int n_grps,
                  const std::vector<double>& x_breaks,
                  const std::vector<double>& y_breaks,
                  const std::vector<double>& z_breaks)
+    : NeutMFEM(order, order, n_grps, x_breaks, y_breaks, z_breaks) 
+{
+    // Ce corps est vide car tout est fait dans le constructeur ci-dessous
+}
+
+NeutMFEM::NeutMFEM(int order_phi, int order_J, int n_grps,
+                 const std::vector<double>& x_breaks,
+                 const std::vector<double>& y_breaks,
+                 const std::vector<double>& z_breaks)
     : n_grps_(n_grps)
+    , order_phi_(order_phi)
+    , order_J_(order_J)
     , verbosity_(VerbosityLevel::NORMAL)
     , has_quarter_symmetry_(false)
     , has_central_symmetry_(false)
@@ -166,13 +177,15 @@ NeutMFEM::NeutMFEM(int order, int n_grps,
     mesh_->Finalize(true);
 
     // Espaces éléments finis
-    fec_J_   = new mfem::RT_FECollection(order, dim);
-    fec_Phi_ = new mfem::L2_FECollection(order, dim);
+    fec_J_   = new mfem::RT_FECollection(order_J_, dim);
+    fec_Phi_ = new mfem::L2_FECollection(order_phi_, dim);
     fec_Mat_ = new mfem::L2_FECollection(0, dim);
 
     fes_J_   = new mfem::FiniteElementSpace(mesh_, fec_J_);
     fes_Phi_ = new mfem::FiniteElementSpace(mesh_, fec_Phi_);
     fes_Mat_ = new mfem::FiniteElementSpace(mesh_, fec_Mat_);
+
+    Log(VerbosityLevel::NORMAL, "Ordres : Flux P", order_phi_, ", Courant RT", order_J_);
 
     fes_J_mg_ = new mfem::FiniteElementSpace(
         mesh_, fec_J_, n_grps, mfem::Ordering::byNODES);
@@ -766,7 +779,7 @@ void NeutMFEM::SolveGroupInternal(int g_idx, const mfem::Vector& integrated_src,
     mfem::BlockOperator op(offsets);
     op.SetBlock(0, 0, A_mats_[g_idx]);
     op.SetBlock(0, 1, BT_mat_, -1.0);
-    op.SetBlock(1, 0, B_mat_, -1.0);
+    op.SetBlock(1, 0, B_mat_, 1.0);
     op.SetBlock(1, 1, C_mats_[g_idx]);
 
     std::unique_ptr<mfem::IterativeSolver> solver(CreateLinearSolver(type));
@@ -1334,10 +1347,12 @@ double NeutMFEM::SolveKeff(LinearSolverType solver_type, bool use_coarse_init,
         Log(VerbosityLevel::NORMAL, "\n--- Phase de raffinement fine ---");
     }
 
+    Log(VerbosityLevel::NORMAL, "Ordres : Flux P", order_phi_, ", Courant RT", order_J_);
+
     // ========================================================================
     // PHASE FINE
     // ========================================================================
-    ChebyshevAccelerator accel(15, 0.98);
+    ChebyshevAccelerator accel(10, 0.98);
     mfem::Vector total_fiss(n_phi_dofs), prod_g(n_phi_dofs);
     mfem::Vector phi_g_view, phi_gp_view;
 
@@ -1440,7 +1455,7 @@ double NeutMFEM::SolveAdjoint(LinearSolverType solver_type,
     double keff_adj = 1.0;
     double diff_k = 1.0;
 
-    ChebyshevAccelerator accel(10, 0.9);
+    ChebyshevAccelerator accel(10, 0.98);
     mfem::Vector total_fiss_adj(n_phi_dofs), prod_g(n_phi_dofs);
     mfem::Vector phi_adj_g, phi_adj_gp;
 
