@@ -157,6 +157,11 @@ normalize_eigenvectors : bool, default=True
              py::arg("order"), py::arg("num_groups"),
              py::arg("x_breaks"), py::arg("y_breaks"), py::arg("z_breaks"),
              "Constructeur du solveur neutronique")
+        .def(py::init<int, int, int, const std::vector<double>&,
+                      const std::vector<double>&, const std::vector<double>&>(),
+             py::arg("order_phi"), py::arg("order_J"),py::arg("num_groups"),
+             py::arg("x_breaks"), py::arg("y_breaks"), py::arg("z_breaks"),
+             "Constructeur du solveur neutronique")
 
         // Configuration
         .def("set_bc", &NeutMFEM::SetBC,

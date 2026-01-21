@@ -162,6 +162,11 @@ public:
             const std::vector<double>& y_breaks,
             const std::vector<double>& z_breaks);
 
+    NeutMFEM(int order_phi, int order_J, int n_grps_,
+            const std::vector<double>& x_breaks,
+            const std::vector<double>& y_breaks,
+            const std::vector<double>& z_breaks);
+
     ~NeutMFEM();
 
     NeutMFEM(const NeutMFEM&) = delete;
@@ -533,6 +538,9 @@ private:
     // ========================================================================
     // DONNÉES MEMBRES - PARAMÈTRES
     // ========================================================================
+    
+    int order_phi_ = 0 ;
+    int order_J_ = 0 ;
     
     SolverParameters params_;
     VerbosityLevel verbosity_;
