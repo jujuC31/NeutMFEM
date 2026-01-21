@@ -779,7 +779,7 @@ void NeutMFEM::SolveGroupInternal(int g_idx, const mfem::Vector& integrated_src,
     mfem::BlockOperator op(offsets);
     op.SetBlock(0, 0, A_mats_[g_idx]);
     op.SetBlock(0, 1, BT_mat_, -1.0);
-    op.SetBlock(1, 0, B_mat_, -1.0);
+    op.SetBlock(1, 0, B_mat_, 1.0);
     op.SetBlock(1, 1, C_mats_[g_idx]);
 
     std::unique_ptr<mfem::IterativeSolver> solver(CreateLinearSolver(type));
