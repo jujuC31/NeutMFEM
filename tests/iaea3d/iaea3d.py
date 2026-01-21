@@ -33,7 +33,8 @@ class Iaea3D:
         self.kref = 1.029096  # k-eff référence
         self.num_groups = 2
         self.verbose = 0
-        self.order = 0
+        self.order_phi = 0
+        self.order_J = 0
         
         self.init_meshing = False
         self.mysolv = None
@@ -393,7 +394,7 @@ class Iaea3D:
         if adjoint :
             self.keff = self.mysolv.solve_adjoint(solver_type=solver_type, normalize_to_direct=True, use_direct_keff=False)
         
-        if self.order == 0:
+        if self.order_phi == 0:
             self.phi = np.array([
                 self.mysolv.get_flux()[g] for g in range(self.num_groups)
             ])
@@ -418,7 +419,7 @@ class Iaea3D:
         print("="*60)
 
         # Puissance
-        if self.order == 0 and self.phi is not None:
+        if self.order_phi == 0 and self.phi is not None:
             Nz, Ny, Nx = self.maillage.shape
             self.pvol = np.zeros((Nz, Ny, Nx))
             
@@ -487,8 +488,10 @@ if __name__ == "__main__":
                        help="Activer le calcul de l'adjoint en utilisant les résultat du forward", default= False)
     parser.add_argument("--plot", action="store_true",
                        help="Afficher les graphiques", default= False)
-    parser.add_argument("--ordre", type=int, default=0,
-                       help="Ordre des élements RT")
+    parser.add_argument("--ordre_phi", type=int, default=0,
+                       help="Ordre des élements du flux")
+    parser.add_argument("--ordre_J", type=int, default=-1,
+                       help="Ordre des élements RT du courant")
     parser.add_argument("--harmonics", type=int, default=0,
                        help="Nb d'harmoniques a calculer")
     args = parser.parse_args()
@@ -514,7 +517,13 @@ if __name__ == "__main__":
     
     # Création
     iaea3d = Iaea3D(meshtype=args.mesh, domaine=args.domain)
-    iaea3d.order = args.ordre
+    iaea3d.order_phi = args.ordre_phi
+    
+    if args.ordre_J != -1 :
+        iaea3d.order_J = args.ordre_J
+    else :
+        iaea3d.order_J = iaea3d.order_phi
+
     iaea3d.load_iaea3d_mat(include_upscattering=args.upscatter)
     iaea3d.mesh_initialisation()
     
@@ -533,9 +542,9 @@ if __name__ == "__main__":
     
 
     # Export
-    iaea2d.mysolv.save_vtk("iaea3d_result")
-    iaea2d.mysolv.save_vtk_coarse("iaea3d_result_coarse")
-    iaea2d.mysolv.save_vtk_zoom("iaea3d_result_zoom")
+    iaea3d.mysolv.save_vtk("iaea3d_result")
+    iaea3d.mysolv.save_vtk_coarse("iaea3d_result_coarse")
+    iaea3d.mysolv.save_vtk_zoom("iaea3d_result_zoom")
     print("\n📁 Résultats exportés: iaea3d_result.vtk")
     
     # Visualisation
@@ -547,11 +556,28 @@ if __name__ == "__main__":
         iaea3d.plot_flux(group=0, fine=True)
         iaea3d.plot_flux(group=1, fine=True)
 
-    if args.harmonics > 0:
-        # Calculer les harmoniques
-        alphas = iaea3d.mysolv.solve_harmonics(n_harmonics=args.harmonics)
-        print(f"Valeurs propres harmoniques: {alphas}")
-        iaea3d.mysolv.save_harmonics_vtk("harmonics")
+    if args.harmonics > 0 :
+        # Calculer les 5 premiers harmoniques
+        results = iaea3d.mysolv.solve_eigenmodes(args.harmonics)
+
+        # Afficher les résultats
+        for r in results:
+            print(f"Mode {r.mode_index}: k = {r.eigenvalue:.6f}")
+            print(f"  Ratio de dominance: {r.dominance_ratio:.4f}")
+            print(f"  Convergé: {r.converged}, Itérations: {r.iterations}")
+
+        # Récupérer les flux
+        phi_1 = iaea3d.mysolv.get_eigenvector(1)
+        phi_2 = iaea3d.mysolv.get_eigenvector(2)
+        phi_3 = iaea3d.mysolv.get_eigenvector(3)
+        phi_4 = iaea3d.mysolv.get_eigenvector(4)
+
+        # Récupérer toutes les eigenvalues
+        eigenvalues = iaea3d.mysolv.get_eigenvalues()
+        print(eigenvalues)
+
+        # Export VTK
+        iaea3d.mysolv.save_eigenvectors_vtk("harmonics_output", max_modes=5)
 
     print(f"\n⏱️  Temps total : {time.time() - iaea3d.start:.2f} s")
     print("="*60)

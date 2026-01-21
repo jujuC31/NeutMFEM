@@ -35,7 +35,8 @@ class Biblis2D:
         self.kref = 1.02511  # k-eff référence IAEA
         self.num_groups = 2
         self.verbose = 0
-        self.order = 0
+        self.order_phi = 0
+        self.order_J = 0
         
         self.init_meshing = False
         self.mysolv = None
@@ -251,7 +252,9 @@ class Biblis2D:
 
         # Instanciation
         self.mysolv = neutron_solver.NeutMFEM(
-            self.order, self.num_groups,
+            self.order_phi,
+	    self.order_J,
+	    self.num_groups,
             self.x_breaks.tolist(),
             self.y_breaks.tolist(),
             self.z_breaks.tolist()
@@ -347,7 +350,7 @@ class Biblis2D:
         if adjoint :
              self.keff = self.mysolv.solve_adjoint(solver_type=solver_type, normalize_to_direct=True, use_direct_keff=False)
         
-        if self.order == 0:
+        if self.order_phi == 0:
             self.phi = np.array([
                 self.mysolv.get_flux()[g] for g in range(self.num_groups)
             ])
@@ -372,7 +375,7 @@ class Biblis2D:
         print("="*60)
 
         # Puissance
-        if self.order == 0 and self.phi is not None:
+        if self.order_phi == 0 and self.phi is not None:
             Ny, Nx = self.maillage.shape
             self.pvol = np.zeros((Ny, Nx))
             
@@ -438,8 +441,10 @@ if __name__ == "__main__":
                        help="Activer le calcul de l'adjoint en utilisant les résultat du forward", default= False)
     parser.add_argument("--plot", action="store_true",
                        help="Afficher les graphiques", default= False)
-    parser.add_argument("--ordre", type=int, default=0,
-                       help="Ordre des élements RT")
+    parser.add_argument("--ordre_phi", type=int, default=0,
+                       help="Ordre des élements du flux")
+    parser.add_argument("--ordre_J", type=int, default=-1,
+                       help="Ordre des élements RT du courant")
     parser.add_argument("--harmonics", type=int, default=0,
                        help="Nb d'harmoniques a calculer")
     args = parser.parse_args()
@@ -465,7 +470,13 @@ if __name__ == "__main__":
     
     # Création
     biblis2d = Biblis2D(meshtype=args.mesh, domaine=args.domain)
-    biblis2d.order = args.ordre
+    biblis2d.order_phi = args.ordre_phi
+    
+    if args.ordre_J != -1 :
+        biblis2d.order_J = args.ordre_J
+    else :
+        biblis2d.order_J = biblis2d.order_phi
+
     biblis2d.load_biblis2d_mat(include_upscattering=args.upscatter)
     biblis2d.mesh_initialisation()
     
